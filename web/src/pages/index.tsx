@@ -10,25 +10,34 @@ import { isUserAuthenticated } from 'lib/auth';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Cross2Icon } from '@radix-ui/react-icons';
 
+
 const inter = Inter({ subsets: ['latin'] })
 const AudioContext = React.createContext(undefined);
 
 const AudioProvider = ({ children, bibsAmount, setBibsAmount, systemMessage, messages, setMessages, audioChunksRef, unwantedTopics, unwantedKeywords }: any) => {
+  
+  const [audioLoading, setAudioLoading]= useState(false);
+  const [audioState, setAudioState] = useState(new Blob(audioChunksRef.current, { type: 'audio/wave' }));
+
   const uploadAudio = async (audioBlob: any) => {
+    setAudioLoading(true)
     const formData = new FormData();
-    formData.append('audio', audioBlob, 'recording.wav');
+    formData.append('audio', audioBlob, 'recording.wave');
+
+    setAudioState(audioBlob);
 
     let systemMessageWithFilteringUnwantedKeywordsAndTopics = systemMessage;
     if (!!unwantedTopics) {
-      systemMessageWithFilteringUnwantedKeywordsAndTopics.content += ` You are not allowed to talk about these topics: ${unwantedTopics}.`;
+      systemMessageWithFilteringUnwantedKeywordsAndTopics.content +=  'You are not allowed to talk about these topics: ${unwantedTopics}';
     }
 
     if (!!unwantedKeywords) {
-      systemMessageWithFilteringUnwantedKeywordsAndTopics.content += ` You are not allowed to talk using these words: ${unwantedKeywords}. If you hear these words in a question, tell in response that you don't want to talk about them. `;
+      systemMessageWithFilteringUnwantedKeywordsAndTopics.content += "You are not allowed to talk using these words: ${unwantedKeywords}. If you hear these words in a question, tell in response that you don't want to talk about them." ;
     }
-
+    
+    //API CALL WORKS AND FAILS IN SOME WAY.  UNKNOWN CORS ERROR FROM PYTHON BACKEND IS STILL HAPPENING
     formData.append('messages', JSON.stringify([systemMessageWithFilteringUnwantedKeywordsAndTopics, ...messages]));
-    await axios.post('/api/question', formData, { responseType: 'arraybuffer', headers: { "chatbot-api-key": process.env.CHATBOT_API_KEY } })
+    await axios.post('http://localhost:5600/question', formData, { headers: {  'Content-Type': 'multipart/form-data', "chatbot-api-key": process.env.CHATBOT_API_KEY,   }, withCredentials: true, })
       // TODO maybe remove chatbot-api-key header from here - it should be passed to api in question.js and it is already done
       .then((response) => {
         audioChunksRef.current = [];
@@ -40,9 +49,14 @@ const AudioProvider = ({ children, bibsAmount, setBibsAmount, systemMessage, mes
 
         const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
         const audioUrl = URL.createObjectURL(audioBlob);
-
+        console.log(audioUrl)
         const audio = new Audio(audioUrl);
+
+        setAudioLoading(false)
+
         audio.play();
+        /*
+        use some other way to determine tokens here, see if it works
         axios.get('/api/my-tokens')
           .then((response) => {
             setBibsAmount(response.data.tokens);
@@ -50,15 +64,21 @@ const AudioProvider = ({ children, bibsAmount, setBibsAmount, systemMessage, mes
           .catch((error) => {
             console.log(error);
           });
+          */
         // TODO - make api call to retrieve current amount of tokens
       })
       .catch((error) => {
-        console.log(error);
+        console.log("error", error);
+        if (error instanceof axios.AxiosError) {//finds instance of axioserror
+          uploadAudio(audioState);
+        }
+       
+       
       });
   };
 
   return (
-    <AudioContext.Provider value={uploadAudio}>
+    <AudioContext.Provider value={{uploadAudio, audioLoading}}>
       {children}
     </AudioContext.Provider>
   );
@@ -66,41 +86,102 @@ const AudioProvider = ({ children, bibsAmount, setBibsAmount, systemMessage, mes
 
 export default function Home() {
   const audioChunksRef = useRef([]);
-
+//when user loads the "home page", we set these values, and allow them to be sent down to 
+// audioProvider and page, we would need to fetch the bitcoin and pass it down here...
+//note that the provider only allows the uploadAudio function within the page to be used there. 
   const [bibsAmount, setBibsAmount] = useState(undefined);
   const [systemMessage, setSystemMessage] = useState({ "role": "system", "content": "You are a robot, which serves as a very friendly teacher to a kid. Explain your responses like the kid is five. Try to be cheerful and playful, but don't exaggerate." });
   const [unwantedTopics, setUnwantedTopics] = useState("violence");
   const [unwantedKeywords, setUnwantedKeywords] = useState("violent");
-  const [messages, setMessages] = useState([
-    { "role": "user", "content": "Why adults wear suits?" },
+  const [messages, setMessages] = useState([//replace with nothing as im not sure why we need it
+    /*{ "role": "user", "content": "Why adults wear suits?" },
     {
       "role": "assistant",
       "content": "Well, maybe they want to look serious! But really I think that sometimes they just have to. Their boss at work tell them to do so."
-    }
+    }*/
   ]);
+//note that you can pass down states here, just note that in the case we dont use multiple components, we need
+//to render using a component that dosent render anything for it to work,
+//so using passing down states -> 2 components, 
+//one component that dosent render anything but have states(Home) + one component inside that does(Page)
+//we should use when we want to make it more readbale with less states in one component
+useEffect(() => {
+  const fetchData = async () => {
+    try {
+      // Make GET request to some-route
+      const response = await axios.get('http://localhost:8000/verifyUser', {
+        headers: { 'Content-Type': 'application/json' },
+        withCredentials: true // Ensure cookies are sent/received if needed
+      });
+      
+      // Log the response data
+      console.log('Response data:', response.data);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
 
+
+  fetchData();
+}, []);
+/*
+useEffect(() => {
+  const giveData = async () => {
+    try {
+      // Make GET request to some-route //'http://localhost:8000/question'
+      const response = await axios.post('http://localhost:8000/question',{}, {
+        headers: { 'Content-Type': 'application/json' },
+        withCredentials: true // Ensure cookies are sent/received if needed
+      });
+      
+      // Log the response data
+      console.log('Response data:', response.data);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+    }
+  };
+  
+
+  giveData();
+}, []);
+*/
   return (
     <AudioProvider bibsAmount={bibsAmount} setBibsAmount={setBibsAmount} setMessages={setMessages} messages={messages} audioChunksRef={audioChunksRef} systemMessage={systemMessage} unwantedTopics={unwantedTopics} unwantedKeywords={unwantedKeywords}>
-      <Page bibsAmount={bibsAmount} setBibsAmount={setBibsAmount} audioChunksRef={audioChunksRef} setUnwantedTopics={setUnwantedTopics} setUnwantedKeywords={setUnwantedKeywords} unwantedTopics={unwantedTopics} unwantedKeywords={unwantedKeywords} />
+      <Page  bibsAmount={bibsAmount} setBibsAmount={setBibsAmount} audioChunksRef={audioChunksRef} setUnwantedTopics={setUnwantedTopics} setUnwantedKeywords={setUnwantedKeywords} unwantedTopics={unwantedTopics} unwantedKeywords={unwantedKeywords} />
     </AudioProvider>
   );
 }
 
-const Page = ({ bibsAmount, setBibsAmount, audioChunksRef, setUnwantedTopics, setUnwantedKeywords, unwantedKeywords, unwantedTopics }: any) => {
+const Page = ({ bibsAmount,  setBibsAmount, audioChunksRef, setUnwantedTopics, setUnwantedKeywords, unwantedKeywords, unwantedTopics }: any) => {
   const [showTip, setShowTip] = useState(true);
   const [recording, setRecording] = useState(false);
   const [playing, setPlaying] = useState(false);
   const mediaRecorderRef = useRef(null);
   const { user, isLoading } = useUser();
   const isAuthenticated = isUserAuthenticated(user);
+  const [subscriptionUrl, setSubscriptionUrl] = useState('')
+  const [Subscription, setSubscription] = useState(false)
+  const {uploadAudio, audioLoading}  = useContext(AudioContext);
+  if(user){
+    
+    console.log(user)
+  }
 
-  const uploadAudio = useContext(AudioContext);
 
+  const stopAllMediaTracks = (stream: MediaStream) => {
+    stream.getTracks().forEach(track => track.stop());
+  };
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const startRecording = () => {
     setShowTip(false);
+   
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then((stream) => {
         const mediaRecorder = new MediaRecorder(stream);
+        if (mediaStreamRef.current) {
+          stopAllMediaTracks(mediaStreamRef.current);
+          mediaStreamRef.current = null;  // Clear the media stream ref
+        }
         mediaRecorder.onstop = () => { };
         mediaRecorder.ondataavailable = () => { };
         mediaRecorderRef.current = mediaRecorder;
@@ -108,25 +189,35 @@ const Page = ({ bibsAmount, setBibsAmount, audioChunksRef, setUnwantedTopics, se
         mediaRecorder.addEventListener('dataavailable', handleDataAvailable);
         mediaRecorder.start();
         setRecording(true);
+        mediaStreamRef.current = stream;
       })
       .catch((error) => {
-        console.error('Error accessing the microphone');
+        console.error('Error accessing the microphone', error);
       });
   };
 
   const stopRecording = () => {
     const mediaRecorder = mediaRecorderRef.current;
-
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
       setRecording(false);
       mediaRecorder.removeEventListener('dataavailable', handleDataAvailable);
       mediaRecorder.stop();
+      if (mediaStreamRef.current) {
+        stopAllMediaTracks(mediaStreamRef.current);
+        mediaStreamRef.current = null;  // Clear the media stream ref
+      }
     }
+    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wave' });
+    let count = 0;
 
+    uploadAudio(audioBlob);
+   
+    /*
     setTimeout(() => {
       const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
       uploadAudio(audioBlob);
     }, 200)
+    */
   };
 
   const handleDataAvailable = (event: any) => {
@@ -134,12 +225,17 @@ const Page = ({ bibsAmount, setBibsAmount, audioChunksRef, setUnwantedTopics, se
   };
 
   const buyIntent = async () => {
-    const res = await axios.post('/api/buy-tokens');
+    const res = await axios.post('http://localhost:8000/buy-tokens',{}, {
+      headers: { 'Content-Type': 'application/json' },
+       withCredentials: true, 
+       
+   });
+   console.log(res)
     if (res?.data?.redirectUrl) {
       document.location.assign(res.data.redirectUrl);
     }
   }
-
+/*
   useEffect(() => {
     axios.get('/api/my-tokens')
       .then((response) => {
@@ -149,6 +245,22 @@ const Page = ({ bibsAmount, setBibsAmount, audioChunksRef, setUnwantedTopics, se
         console.log(error);
       });
   }, [setBibsAmount]);
+*/
+useEffect(() => {
+  axios.get('http://localhost:8000/my-tokens', { headers: { 'Content-Type': 'application/json' },
+    withCredentials: true,   
+})
+    .then((response) => {
+      setBibsAmount(response.data.quantity || 0);
+      setSubscriptionUrl(response.data.portal_url || '');
+      console.log(response.data.status)
+      setSubscription(response.data.status ==='active' || false)
+    })
+    .catch((error) => {
+      console.log(error);
+    });
+}, [setBibsAmount]);
+
 
   const redirectToSignUp = () => {
     window.location.assign('/api/auth/signup');
@@ -187,10 +299,11 @@ const Page = ({ bibsAmount, setBibsAmount, audioChunksRef, setUnwantedTopics, se
         }, 9000); // TODO - adjust to response length
       })
       .catch((error) => {
+  
         console.log(error);
       });
   }
-
+  //isAuthenticated ? (bibsAmount > 0 ? (!recording ? startRecording : stopRecording) : (!playing ? getNoTokensVoice : undefined)) : (!playing ? getNotAuthenticatedVoice : undefined
   return (
     <main className={`main ${inter.className}`} >
       <div className={'description'}>
@@ -199,7 +312,7 @@ const Page = ({ bibsAmount, setBibsAmount, audioChunksRef, setUnwantedTopics, se
             <code className={'code'}>{user.name === user.email ? 'you' : user.name}</code>!</> : <>Hello ^_^<span className='redirectToSignUp' onClick={redirectToSignUp}>&nbsp;Sign up&nbsp;</span>and have fun with Gdańsk AI!</>}
         </p>
         {(showTip || true) && <div className={'bibsAmount'}>
-          <BibsAmount isAuthenticated={isAuthenticated} bibsAmount={bibsAmount} buyIntent={buyIntent} setUnwantedTopics={setUnwantedTopics} setUnwantedKeywords={setUnwantedKeywords} unwantedTopics={unwantedTopics} unwantedKeywords={unwantedKeywords} />
+          <BibsAmount isAuthenticated={isAuthenticated} subscriptionUrl={subscriptionUrl} bibsAmount={bibsAmount} buyIntent={buyIntent} setUnwantedTopics={setUnwantedTopics} setUnwantedKeywords={setUnwantedKeywords} unwantedTopics={unwantedTopics} unwantedKeywords={unwantedKeywords} />
         </div>}
       </div>
       <div className={'center'}>
@@ -214,17 +327,22 @@ const Page = ({ bibsAmount, setBibsAmount, audioChunksRef, setUnwantedTopics, se
               alt="Gdańsk AI"
               width={100}
               height={100}
-              style={{ borderRadius: '20px', cursor: 'pointer' }}
-              onClick={isAuthenticated ? (bibsAmount > 0 ? (!recording ? startRecording : stopRecording) : (!playing ? getNoTokensVoice : undefined)) : (!playing ? getNotAuthenticatedVoice : undefined)}
+              style={{
+                borderRadius: '20px',
+                cursor: !audioLoading ?  'pointer' : 'none' ,
+                transform: audioLoading ?  'none': 'scale(0.95)', // Example of adding a scaling effect
+                filter: audioLoading ? 'brightness(50%) contrast(100%)': '', // Example of adding a shadow effect
+              }}
+              onClick={(!recording ? startRecording : stopRecording)}
               priority
             />
           </motion.div>
         </div>
       </div>
       <div className={'bibsAmountMobile'}>
-        <BibsAmount isAuthenticated={isAuthenticated} bibsAmount={bibsAmount} buyIntent={buyIntent} setUnwantedTopics={setUnwantedTopics} setUnwantedKeywords={setUnwantedKeywords} unwantedTopics={unwantedTopics} unwantedKeywords={unwantedKeywords} />
+        <BibsAmount isAuthenticated={isAuthenticated} subscriptionUrl = {subscriptionUrl} bibsAmount={bibsAmount} buyIntent={buyIntent} setUnwantedTopics={setUnwantedTopics} setUnwantedKeywords={setUnwantedKeywords} unwantedTopics={unwantedTopics} unwantedKeywords={unwantedKeywords} />
       </div>
-      {isAuthenticated ? <div>
+      {(isAuthenticated && !Subscription) ? <div>
         <div className='buy-button' onClick={buyIntent}>
           Buy 🧠 bibs here
         </div>
@@ -238,9 +356,10 @@ const Page = ({ bibsAmount, setBibsAmount, audioChunksRef, setUnwantedTopics, se
         >
         </stripe-buy-button>} */}
       </div> : null}
-      <div className='text-container'>
+      {/*<div className='text-container'>
         <a className='chrome-container' href="https://www.google.com/chrome/" target={"_blank"} rel="noreferrer noopener">I&apos;m available only with Google Chrome yet <img width="20" alt="Google Chrome icon (February 2022)" src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e1/Google_Chrome_icon_%28February_2022%29.svg/512px-Google_Chrome_icon_%28February_2022%29.svg.png" /></a>
       </div>
+      */}
       <div className={'grid'}>
         <Link href="/terms" target="_blank"
           rel="noopener noreferrer" legacyBehavior={true}>
@@ -269,8 +388,12 @@ const Page = ({ bibsAmount, setBibsAmount, audioChunksRef, setUnwantedTopics, se
     </main>
   )
 }
-
-const BibsAmount = ({ isAuthenticated, bibsAmount, buyIntent, setUnwantedTopics, setUnwantedKeywords, unwantedKeywords, unwantedTopics }: any) => isAuthenticated ? <><span className='bigLink bibsAmountNumber' onClick={buyIntent}>🧠 {bibsAmount === undefined ? 'loading bibs...' : `${bibsAmount > 0 ? bibsAmount : 'you have no'} bibs`}</span> <span className={'brand'}>|</span> <ParentalControls setUnwantedTopics={setUnwantedTopics} setUnwantedKeywords={setUnwantedKeywords} unwantedTopics={unwantedTopics} unwantedKeywords={unwantedKeywords} />  <span className={'brand'}>|</span> <Link href='/api/auth/logout' className='bigLink'>Logout</Link></> : <><Link href='/api/auth/signup' className='bigLink'>Sign up</Link> <span className={'brand'}>|</span> <Link href='/api/auth/login' className='bigLink'>Log in</Link></>;
+const seeDetails = (url: string) =>{
+  if(url){
+    window.location.href =url
+  }
+}
+const BibsAmount = ({ isAuthenticated, bibsAmount, subscriptionUrl, buyIntent, setUnwantedTopics, setUnwantedKeywords, unwantedKeywords, unwantedTopics }: any) => isAuthenticated ? <>   <span className='bigLink bibsAmountNumber' onClick={()=>{seeDetails(subscriptionUrl)}}>🧠 {bibsAmount === undefined ? 'loading bibs...' : `${bibsAmount > 0 ? bibsAmount : 'You have no'} responses used`}</span>      <span className={'brand'}>|</span> <ParentalControls setUnwantedTopics={setUnwantedTopics} setUnwantedKeywords={setUnwantedKeywords} unwantedTopics={unwantedTopics} unwantedKeywords={unwantedKeywords} />  <span className={'brand'}>|</span> <Link href='/api/auth/logout' className='bigLink'>Logout</Link></> : <><Link href='/api/auth/signup' className='bigLink'>Sign up</Link> <span className={'brand'}>|</span> <Link href='/api/auth/login' className='bigLink'>Log in</Link></>;
 
 const ParentalControls = ({ setUnwantedTopics, setUnwantedKeywords, unwantedKeywords, unwantedTopics }: any) => (
   <Dialog.Root>
