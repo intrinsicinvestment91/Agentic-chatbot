@@ -1,0 +1,67 @@
+#
+# Updated requirements for ai-api to align with modern versions and avoid conflicts
+#
+
+# === Core Networking ===
+aiohttp>=3.9.5         # compatible with root and modern async libs
+httpx>=0.27.0          # aligns with root requirements
+httpcore>=0.17.0       # compatible with httpx>=0.27.0
+async-timeout>=4.0.3
+aiosignal>=1.3.1
+attrs>=23.1.0
+
+# === FastAPI and Related ===
+fastapi>=0.110.0       # updated FastAPI
+uvicorn>=0.30.0        # updated Uvicorn
+starlette>=0.27.0
+jinja2>=3.1.3
+markupsafe>=2.1.5
+python-multipart>=0.0.9
+
+# === Google APIs ===
+google>=3.0.0
+google-api-core[grpc]>=2.11.0
+google-api-python-client>=2.86.0
+google-auth>=2.23.0
+google-auth-httplib2>=0.2.0
+google-cloud>=0.34.0
+google-cloud-texttospeech>=2.14.1
+googleapis-common-protos>=1.70.0
+grpcio>=1.58.0
+grpcio-status>=1.58.0
+proto-plus>=1.23.0
+protobuf>=5.0.0
+rsa>=4.9
+pyasn1>=0.5.0
+pyasn1-modules>=0.3.0
+uritemplate>=4.1.1
+httplib2>=0.22.0
+cachetools>=5.3.2
+
+# === LLM and OpenAI ===
+openai>=1.70.0         # updated OpenAI to match root requirements
+tqdm>=4.66.4
+together>=0.2.10
+llama-index>=0.10.50
+llama-index-llms-together>=0.1.6
+langchain>=0.3.0
+# === Pydantic and Typing ===
+pydantic>=2.7.4        # upgraded for modern FastAPI/langchain compatibility
+typing-extensions>=4.7
+pyttsx3>=2.90
+
+# === Miscellaneous ===
+beautifulsoup4>=4.12.3
+soupsieve>=2.5
+requests>=2.32.3
+certifi>=2024.2.2
+charset-normalizer>=3.3.0
+idna>=3.4
+urllib3>=2.2.2
+six>=1.16.0
+sniffio>=1.3.0
+scipy>=1.12.0
+numpy>=1.26.0
+
+# === Environment ===
+python-dotenv>=1.0.1

@@ -1,0 +1,14 @@
+# === Core Shared Dependencies ===
+aiohttp>=3.9.5
+python-dotenv>=1.0.1
+requests>=2.32.3
+
+# === Optional for LLM integrations ===
+openai>=1.70.0        # Required if any agent still uses OpenAI SDK
+httpx>=0.27.0         # Needed for modern async HTTP clients
+pydantic>=2.7.4       # Required for LangChain and modern validation
+typing-extensions>=4.7
+langchain>=0.3.0
+# === Include Service-Specific Requirements ===
+-r ai_api/requirements.txt
+# -r web-api/requirements.txt
